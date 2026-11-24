@@ -1,0 +1,16 @@
+{
+  "name": "lupus-valle-giulia",
+  "version": "1.0.0",
+  "description": "Lupus in Tabula multiplayer - Facoltà di Architettura Valle Giulia",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

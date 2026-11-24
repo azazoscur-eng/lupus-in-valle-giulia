@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Lupus – Valle Giulia</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg: #0c1017; --card: #151c27; --indigo: #2a3a5c; --gold: #c9a86c;
+      --text: #e8e4d9; --muted: #8a93a8; --danger: #b85c5c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100dvh; line-height: 1.45;
+    }
+    .screen { display: none; min-height: 100dvh; padding: 1rem; max-width: 480px; margin: 0 auto; }
+    .screen.active { display: flex; flex-direction: column; }
+    .btn {
+      background: linear-gradient(135deg, var(--indigo), #1e2a40);
+      color: var(--text); border: 1px solid rgba(201,168,108,0.35);
+      border-radius: 12px; padding: 0.85rem 1.3rem; font-size: 1rem;
+      font-weight: 600; cursor: pointer; width: 100%; margin-top: 0.55rem;
+    }
+    .btn.primary { background: linear-gradient(135deg, #3d5a80, #2a4060); border-color: var(--gold); }
+    .btn.danger { background: linear-gradient(135deg, #6b3030, #4a2020); border-color: var(--danger); }
+    input {
+      width: 100%; padding: 0.75rem 1rem; border-radius: 10px;
+      border: 1px solid var(--indigo); background: #0f1520; color: var(--text);
+      font-size: 1rem; margin-bottom: 0.55rem;
+    }
+    .card {
+      background: var(--card); border: 1px solid rgba(107,140,174,0.25);
+      border-radius: 16px; padding: 1.1rem; margin-bottom: 0.85rem;
+    }
+    .player-list { list-style: none; }
+    .player-list li {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.5rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.92rem;
+    }
+    .badge {
+      font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 5px;
+      background: var(--indigo); color: var(--gold);
+    }
+    .badge.bot { background: #2a3540; color: var(--muted); }
+    .badge.dead { background: #3a2020; color: #c08080; }
+    .badge.you { background: #2a4035; color: #8fbc8f; }
+    .badge.host { background: #3a3020; color: #e0c080; }
+    .log {
+      background: #0a0e14; border-radius: 12px; padding: 0.8rem;
+      font-size: 0.84rem; max-height: 180px; overflow-y: auto;
+      margin: 0.6rem 0; border: 1px solid rgba(107,140,174,0.15);
+    }
+    .log p { margin-bottom: 0.3rem; color: var(--muted); }
+    .phase {
+      text-align: center; padding: 0.6rem; border-radius: 12px;
+      margin-bottom: 0.85rem; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; font-size: 0.8rem;
+    }
+    .phase.night { background: linear-gradient(90deg,#1a2235,#0f1525); color:#a0b8e0; border:1px solid #2a3a55; }
+    .phase.day { background: linear-gradient(90deg,#2a2818,#1a1810); color:#e0d0a0; border:1px solid #4a4030; }
+    .phase.lobby { background: #1a2230; color: var(--gold); border: 1px solid var(--indigo); }
+    .phase.end { background: #1a3020; color: #a0d0a0; border: 1px solid #2a5030; }
+    .vote-btn, .action-btn {
+      display: block; width: 100%; text-align: left; padding: 0.75rem 1rem;
+      margin-bottom: 0.4rem; background: #121820; border: 1px solid var(--indigo);
+      border-radius: 10px; color: var(--text); font-size: 0.95rem; cursor: pointer;
+    }
+    .small { font-size: 0.78rem; color: var(--muted); }
+    .center { text-align: center; }
+    .title { font-size: 1.3rem; color: var(--gold); margin-bottom: 0.2rem; }
+    .subtitle { font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem; }
+    .role-box {
+      background: #0f1520; border: 1px solid var(--gold); border-radius: 12px;
+      padding: 1rem; margin: 0.8rem 0; text-align: center;
+    }
+    .role-name { font-size: 1.2rem; color: var(--gold); margin-bottom: 0.4rem; }
+    .recap {
+      background: #0f1520; border: 1px solid var(--gold); border-radius: 12px;
+      padding: 1rem; font-size: 0.86rem; white-space: pre-wrap; line-height: 1.5;
+    }
+    .code-big { font-size: 2rem; letter-spacing: 0.25em; color: var(--gold); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <!-- HOME -->
+  <div id="home" class="screen active">
+    <div class="center" style="margin-top:2rem">
+      <div class="title">Lupus in Tabula</div>
+      <div class="subtitle">Facoltà di Architettura · Valle Giulia · Sapienza</div>
+    </div>
+    <div class="card">
+      <input id="nameInput" placeholder="Il tuo nome" maxlength="16" />
+      <button class="btn primary" onclick="createRoom()">Crea stanza</button>
+    </div>
+    <div class="card">
+      <input id="codeInput" placeholder="Codice stanza (5 lettere)" maxlength="5" style="text-transform:uppercase" />
+      <button class="btn" onclick="joinRoom()">Entra nella stanza</button>
+    </div>
+    <p class="small center">3 umani + 5 bot · Ruoli casuali equi · Voti anonimi</p>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="lobby" class="screen">
+    <div class="phase lobby">Lobby</div>
+    <div class="center">
+      <div class="small">Codice stanza</div>
+      <div class="code-big" id="roomCode">-----</div>
+      <p class="small" style="margin:0.5rem 0 1rem">Condividi questo codice con gli altri due</p>
+    </div>
+    <div class="card">
+      <div class="small" style="margin-bottom:0.4rem">Giocatori (max 3 umani)</div>
+      <ul class="player-list" id="lobbyList"></ul>
+    </div>
+    <button class="btn primary hidden" id="startBtn" onclick="startGame()">Inizia partita (assegna ruoli)</button>
+    <p class="small center" id="lobbyHint">Aspetta che arrivino gli altri…</p>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="screen">
+    <div id="phaseBanner" class="phase night">Notte 1</div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">
+        <strong id="aliveCount">Vivi: 8</strong>
+        <span class="small" id="roundInfo"></span>
+      </div>
+      <ul class="player-list" id="playerList"></ul>
+    </div>
+
+    <div id="myRoleCard" class="role-box hidden">
+      <div class="small">Il tuo ruolo</div>
+      <div class="role-name" id="myRoleName"></div>
+      <div class="small" id="myRoleDesc"></div>
+    </div>
+
+    <div id="actionArea" class="card"></div>
+    <div class="log" id="gameLog"></div>
+  </div>
+
+  <!-- END -->
+  <div id="end" class="screen">
+    <div class="phase end" id="endTitle">Fine</div>
+    <div class="card">
+      <h3 style="color:var(--gold);margin-bottom:0.6rem">Recap</h3>
+      <div class="recap" id="recapText"></div>
+    </div>
+    <button class="btn primary" onclick="copyRecap()">Copia recap</button>
+    <button class="btn" onclick="location.reload()">Nuova partita</button>
+  </div>
+
+<script>
+const socket = io();
+let myId = null;
+let currentState = null;
+let isHost = false;
+
+socket.on('connect', () => { myId = socket.id; });
+
+socket.on('joined', ({ code, isHost: host }) => {
+  isHost = host;
+  document.getElementById('roomCode').textContent = code;
+  show('lobby');
+  if (isHost) {
+    document.getElementById('startBtn').classList.remove('hidden');
+    document.getElementById('lobbyHint').textContent = 'Quando siete in 3 clicca Inizia';
+  }
+});
+
+socket.on('error', (msg) => alert(msg));
+
+socket.on('state', (s) => {
+  currentState = s;
+  render(s);
+});
+
+socket.on('seerResult', ({ name, isWolf }) => {
+  alert(`Indagine Fuoricorso:\n${name} è ${isWolf ? 'un PROFESSORE (Lupo) 🐺' : 'uno STUDENTE / non-lupo 🧑‍🎓'}`);
+});
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function createRoom() {
+  const name = document.getElementById('nameInput').value.trim() || 'Studente';
+  socket.emit('create', { name });
+}
+
+function joinRoom() {
+  const name = document.getElementById('nameInput').value.trim() || 'Studente';
+  const code = document.getElementById('codeInput').value.trim().toUpperCase();
+  if (!code) return alert('Inserisci il codice');
+  socket.emit('join', { code, name });
+}
+
+function startGame() {
+  socket.emit('start');
+}
+
+function render(s) {
+  if (s.phase === 'lobby') {
+    show('lobby');
+    document.getElementById('roomCode').textContent = s.code;
+    const list = document.getElementById('lobbyList');
+    list.innerHTML = s.players.filter(p => !p.isBot).map(p =>
+      `<li><span>${p.name}</span><span>${p.isHost ? '<span class="badge host">HOST</span>' : ''} ${p.id === myId ? '<span class="badge you">TU</span>' : ''}</span></li>`
+    ).join('');
+    const humans = s.players.filter(p => !p.isBot).length;
+    if (isHost && humans >= 1) {
+      document.getElementById('startBtn').classList.remove('hidden');
+      document.getElementById('lobbyHint').textContent = humans < 3
+        ? `Umani: ${humans}/3 – puoi iniziare anche con meno (i bot riempiono)`
+        : 'Siete in 3! Puoi iniziare.';
+    }
+    return;
+  }
+
+  if (s.phase === 'end') {
+    show('end');
+    document.getElementById('endTitle').textContent =
+      s.winner === 'villaggio' ? 'Gli Studenti hanno vinto!' : 'I Professori hanno vinto!';
+    let recap = `🐺 LUPUS – Valle Giulia Edition\nSapienza Architettura · ${new Date().toLocaleDateString('it-IT')}\n`;
+    recap += `Codice: ${s.code}\n━━━━━━━━━━━━━━━━━━━━\n`;
+    recap += `Giocatori: ${s.players.map(p => p.name).join(', ')}\n\n📜 Cronaca:\n`;
+    (s.history || []).forEach(h => {
+      if (h.type === 'night') {
+        recap += h.victim
+          ? `Notte ${h.night}: ${h.victim} eliminato dai Professori\n`
+          : `Notte ${h.night}: attacco sventato\n`;
+      } else {
+        recap += `Giorno ${h.day}: ${h.victim} linciato\n`;
+      }
+    });
+    recap += `\n🎭 Ruoli:\n`;
+    s.players.forEach(p => {
+      recap += `• ${p.name}: ${p.roleName || '?'}${p.alive ? ' (vivo)' : ' (eliminato)'}\n`;
+    });
+    recap += `\n🏆 ${s.winner === 'villaggio' ? 'Villaggio' : 'Professori'}\n— Valle Giulia 🏛️`;
+    document.getElementById('recapText').textContent = recap;
+    return;
+  }
+
+  // GAME
+  show('game');
+  const banner = document.getElementById('phaseBanner');
+  banner.className = 'phase ' + s.phase;
+  banner.textContent = s.phase === 'night' ? `Notte ${s.night}` : `Giorno ${s.day}`;
+
+  document.getElementById('aliveCount').textContent = `Vivi: ${s.totalAlive}`;
+  document.getElementById('roundInfo').textContent = s.phase === 'night' ? `Notte ${s.night}` : `Giorno ${s.day}`;
+
+  // Lista giocatori
+  document.getElementById('playerList').innerHTML = s.players.map(p => {
+    let b = '';
+    if (p.id === myId) b += '<span class="badge you">TU</span> ';
+    if (p.isBot) b += '<span class="badge bot">BOT</span> ';
+    if (!p.alive) b += '<span class="badge dead">ELIMINATO</span>';
+    return `<li><span>${p.name}${!p.alive ? ' ✝' : ''}</span><span>${b}</span></li>`;
+  }).join('');
+
+  // Ruolo personale
+  const roleCard = document.getElementById('myRoleCard');
+  if (s.myRoleInfo) {
+    roleCard.classList.remove('hidden');
+    document.getElementById('myRoleName').textContent = s.myRoleInfo.name;
+    document.getElementById('myRoleDesc').textContent = s.myRoleInfo.desc;
+  } else {
+    roleCard.classList.add('hidden');
+  }
+
+  // Log
+  document.getElementById('gameLog').innerHTML = (s.log || []).map(l => `<p>${l}</p>`).join('');
+
+  // Azioni
+  const area = document.getElementById('actionArea');
+  const me = s.players.find(p => p.id === myId);
+  if (!me || !me.alive) {
+    area.innerHTML = '<p class="small">Sei eliminato. Osserva la partita.</p>';
+    return;
+  }
+
+  if (s.phase === 'night') {
+    let html = '<h3 style="color:var(--gold);margin-bottom:0.5rem">Azioni notturne</h3>';
+    const alive = s.players.filter(p => p.alive);
+
+    if (s.myRole === 'assistente') {
+      html += `<p class="small">Chi vuoi proteggere?</p>`;
+      alive.forEach(p => {
+        html += `<button class="action-btn" onclick="nightAction('protect','${p.id}')">${p.name}${p.id === myId ? ' (te stesso)' : ''}</button>`;
+      });
+    } else if (s.myRole === 'fuoricorso') {
+      html += `<p class="small">Chi vuoi indagare?</p>`;
+      alive.filter(p => p.id !== myId).forEach(p => {
+        html += `<button class="action-btn" onclick="nightAction('seer','${p.id}')">${p.name}</button>`;
+      });
+    } else if (s.myRole === 'professore') {
+      html += `<p class="small">Scegli la vittima (i Professori votano insieme – basta una scelta)</p>`;
+      alive.filter(p => p.role !== 'professore' || !p.role).forEach(p => { // lato client non conosciamo gli altri ruoli
+        // mostriamo tutti tranne se stessi per sicurezza
+      });
+      alive.filter(p => p.id !== myId).forEach(p => {
+        html += `<button class="action-btn" onclick="nightAction('kill','${p.id}')">${p.name}</button>`;
+      });
+    } else {
+      html += `<p class="small">Non hai azioni notturne. Aspetta…</p>`;
+    }
+    area.innerHTML = html;
+  }
+
+  if (s.phase === 'day') {
+    let html = `<h3 style="color:var(--gold);margin-bottom:0.5rem">Votazione anonima</h3>
+      <p class="small">Voti ricevuti: ${s.votesCount} / ${s.totalAlive}</p>
+      <p class="small">I voti restano nascosti fino a quando tutti hanno votato.</p>`;
+    const alive = s.players.filter(p => p.alive && p.id !== myId);
+    alive.forEach(p => {
+      html += `<button class="vote-btn" onclick="vote('${p.id}')">${p.name}</button>`;
+    });
+    area.innerHTML = html;
+  }
+}
+
+function nightAction(type, targetId) {
+  socket.emit('nightAction', { type, targetId });
+  // Disabilita subito i bottoni
+  document.querySelectorAll('.action-btn').forEach(b => b.disabled = true);
+}
+
+function vote(targetId) {
+  socket.emit('vote', { targetId });
+  document.querySelectorAll('.vote-btn').forEach(b => b.disabled = true);
+}
+
+function copyRecap() {
+  const text = document.getElementById('recapText').textContent;
+  navigator.clipboard.writeText(text).then(() => alert('Recap copiato!')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('Recap copiato!');
+  });
+}
+</script>
+</body>
+</html>
